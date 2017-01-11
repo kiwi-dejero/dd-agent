@@ -39,7 +39,7 @@ MAX_FAILED_HEARTBEATS = 8  # runs of collector
 DEFAULT_COLLECTOR_PROFILE_INTERVAL = 20
 
 
-class AgentSupervisor():
+class AgentSupervisor(object):
     devnull = None
 
     def __init__(self, server=False):
@@ -68,7 +68,7 @@ class AgentSupervisor():
         self._MAX_JMXFETCH_RESTARTS = 3
         self._count_jmxfetch_restarts = 0
 
-        # C:\Program Files(x86)\Datadog\Datadog Agent\agent
+        # C:\Program Files\Datadog\Datadog Agent\agent
         file_dir = os.path.dirname(os.path.realpath(__file__))
         embedded_python = os.path.normpath(
             os.path.join(file_dir, '..', 'embedded', 'python.exe')
