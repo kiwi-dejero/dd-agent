@@ -82,17 +82,27 @@ class AgentSupervisor(object):
         self._MAX_JMXFETCH_RESTARTS = 3
         self._count_jmxfetch_restarts = 0
 
-        # C:\Program Files\Datadog\Datadog Agent\agent
+        # This file is somewhere in the dist directory of the agent
         file_dir = os.path.dirname(os.path.realpath(__file__))
+        search_dir, current_dir = os.path.split(file_dir)
+        # So we go all the way up to the dist directory to find the actual agent dir
+        while current_dir or current_dir != 'dist':
+            search_dir, current_dir = os.path.split(search_dir)
+
+        agent_dir = search_dir
+        # If we don't find it, we use the default
+        if not current_dir:
+            agent_dir = os.path.join('C:\\', 'Program Files', 'Datadog', 'Datadog Agent', 'agent')
+
         embedded_python = os.path.normpath(
-            os.path.join(file_dir, '..', 'embedded', 'python.exe')
+            os.path.join(agent_dir, '..', 'embedded', 'python.exe')
         )
         # This allows us to use the system's Python in case there is no embedded python
         if not os.path.isfile(embedded_python):
             embedded_python = "python"
 
-        # cd to C:\Program Files(x86)\Datadog\Datadog Agent\agent
-        os.chdir(file_dir)
+        # cd to C:\Program Files\Datadog\Datadog Agent\agent
+        os.chdir(agent_dir)
 
         # Keep a list of running processes so we can start/end as needed.
         # Processes will start started in order and stopped in reverse order.
