@@ -245,7 +245,7 @@ class DDProcess(object):
 
         self._restarts.append(time.time())
 
-        if self._proc.is_alive():
+        if self.is_alive():
             self.stop()
 
         self.start()
