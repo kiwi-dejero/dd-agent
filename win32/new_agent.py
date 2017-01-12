@@ -91,40 +91,50 @@ class AgentSupervisor(object):
         while current_dir and current_dir != 'dist':
             search_dir, current_dir = os.path.split(search_dir)
 
-        agent_dir = search_dir
+        dd_dir = search_dir
         # If we don't find it, we use the default
         if not current_dir:
-            agent_dir = os.path.join('C:\\', 'Program Files', 'Datadog', 'Datadog Agent', 'agent')
-
-        embedded_python = os.path.normpath(
-            os.path.join(agent_dir, '..', 'embedded', 'python.exe')
-        )
-        # This allows us to use the system's Python in case there is no embedded python
-        if not os.path.isfile(embedded_python):
-            embedded_python = "python"
+            dd_dir = os.path.join('C:\\', 'Program Files', 'Datadog', 'Datadog Agent')
 
         # cd to C:\Program Files\Datadog\Datadog Agent\agent
-        os.chdir(agent_dir)
+        os.chdir(os.path.join(dd_dir, 'agent'))
 
+        # preparing a clean env for the agent processes
+        env = os.environ.copy()
+        if env.get('PYTHONPATH'):
+            del env['PYTHONPATH']
+        if env.get('PYTHONHOME'):
+            del env['PYTHONHOME']
+        if env['PATH'][-1] != ';':
+            env['PATH'] += ';'
+        log.info('env: %s', env)
+        env['PATH'] += "{};{};".format(os.path.join(dd_dir, 'bin'), os.path.join(dd_dir, 'embedded'))
+
+
+        embedded_python = os.path.join(dd_dir, 'embedded', 'python.exe')
         # Keep a list of running processes so we can start/end as needed.
         # Processes will start started in order and stopped in reverse order.
         self.procs = {
             'forwarder': DDProcess(
                 "forwarder",
-                [embedded_python, "ddagent.py"]
+                [embedded_python, "ddagent.py"],
+                env
             ),
             'collector': DDProcess(
                 "collector",
-                [embedded_python, "agent.py", "foreground", "--use-local-forwarder"]
+                [embedded_python, "agent.py", "foreground", "--use-local-forwarder"],
+                env
             ),
             'dogstatsd': DDProcess(
                 "dogstatsd",
                 [embedded_python, "dogstatsd.py", "--use-local-forwarder"],
+                env,
                 enabled=config.get("use_dogstatsd", True)
             ),
             'jmxfetch': DDProcess(
                 "jmxfetch",
                 [embedded_python, "jmxfetch.py"],
+                env,
                 max_restarts=self._MAX_JMXFETCH_RESTARTS
             ),
         }
@@ -151,7 +161,6 @@ class AgentSupervisor(object):
         self.start_ts = time.time()
 
         # Start all services.
-        log.info('Starting Datadog processes...')
         for proc in self.procs.values():
             proc.start()
 
@@ -176,9 +185,10 @@ class DDProcess(object):
     DEFAULT_MAX_RESTARTS = 5
     _RESTART_TIMEFRAME = 3600
 
-    def __init__(self, name, command, enabled=True, max_restarts=None):
+    def __init__(self, name, command, env, enabled=True, max_restarts=None):
         self._name = name
         self._command = command
+        self._env = env.copy()
         self._enabled = enabled
         self._proc = None
         self._restarts = deque([])
@@ -186,34 +196,25 @@ class DDProcess(object):
 
     def start(self):
         if self.is_enabled():
-            env = os.environ.copy()
-            if env['PATH'][-1] != ';':
-                env['PATH'] += ';'
-
-            # file_path = C:\Program Files(x86)\Datadog\Datadog Agent\
-            file_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-            env['PATH'] += "{};{};".format(os.path.join(file_path, 'bin'), os.path.join(file_path, 'embedded'))
-
-            log.info("Starting %s", self._name)
-            self._proc = psutil.Popen(self._command, stdout=AgentSupervisor.devnull, stderr=AgentSupervisor.devnull, env=env)
+            log.info("Starting %s.", self._name)
+            self._proc = psutil.Popen(self._command, stdout=AgentSupervisor.devnull, stderr=AgentSupervisor.devnull, env=self._env)
         else:
             log.info("%s is not enabled, not starting it.", self._name)
 
     def stop(self):
         if self._proc is not None and self._proc.is_running():
-            log.info("Stopping %s", self._name)
+            log.info("Stopping %s...", self._name)
             self._proc.terminate()
 
             psutil.wait_procs([self._proc], timeout=3)
 
             if self._proc.is_running():
-                log.info("%s doesn't want to exit. "
-                         "Let's shoot him down", self._name)
+                log.debug("%s didn't exit. Killing it.", self._name)
                 self._proc.kill()
 
-            log.info("%s is dead!", self._name)
+            log.info("%s is stopped.", self._name)
         else:
-            log.info('%s was not running', self._name)
+            log.info('%s was not running.', self._name)
 
     def terminate(self):
         self.stop()
