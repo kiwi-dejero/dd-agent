@@ -45,11 +45,13 @@ class AgentSvc(win32serviceutil.ServiceFramework):
     def SvcStop(self):
         # Stop all services.
         self.running = False
+        log.info('Stopping service...')
         self._agent_supervisor.stop()
 
         self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
 
     def SvcDoRun(self):
+        log.info('Starting service...')
         servicemanager.LogMsg(
             servicemanager.EVENTLOG_INFORMATION_TYPE,
             servicemanager.PYS_SERVICE_STARTED,
@@ -64,7 +66,7 @@ class AgentSvc(win32serviceutil.ServiceFramework):
             servicemanager.PYS_SERVICE_STOPPED,
             (self._svc_name_, '')
         )
-        logging.info("Service stopped.")
+        log.info("Service stopped.")
 
 
 class AgentSupervisor(object):
@@ -149,6 +151,7 @@ class AgentSupervisor(object):
         self.start_ts = time.time()
 
         # Start all services.
+        log.info('Starting Datadog processes...')
         for proc in self.procs.values():
             proc.start()
 
@@ -264,20 +267,4 @@ class JMXFetchProcess(DDProcess):
 
 if __name__ == '__main__':
     multiprocessing.freeze_support()
-    log.info("Windows supervisor has just been started...")
-    # Let's start our stuff and register a good old SIGINT callback
-    supervisor = AgentSupervisor()
-
-    def bye_bye(signum, frame):
-        log.info("Stopping all subprocesses...")
-        supervisor.stop()
-        log.info("Have a nice day !")
-        sys.exit(0)
-
-    # Let's get ourselves some traditionnal ways to kill our supervisor
-    signal.signal(signal.SIGINT, bye_bye)
-    signal.signal(signal.SIGTERM, bye_bye)
-    win32api.SetConsoleCtrlHandler(bye_bye, True)
-
-    # Here we go !
-    supervisor.run()
+    win32serviceutil.HandleCommandLine(AgentSvc)
