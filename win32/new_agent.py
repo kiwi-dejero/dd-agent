@@ -88,7 +88,7 @@ class AgentSupervisor(object):
         file_dir = os.path.dirname(os.path.realpath(__file__))
         search_dir, current_dir = os.path.split(file_dir)
         # So we go all the way up to the dist directory to find the actual agent dir
-        while current_dir or current_dir != 'dist':
+        while current_dir and current_dir != 'dist':
             search_dir, current_dir = os.path.split(search_dir)
 
         agent_dir = search_dir
