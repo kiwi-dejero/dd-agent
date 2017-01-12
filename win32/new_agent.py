@@ -59,7 +59,7 @@ class AgentSvc(win32serviceutil.ServiceFramework):
         )
         self.start_ts = time.time()
 
-        self._agent_supervisor.stop()
+        self._agent_supervisor.run()
 
         servicemanager.LogMsg(
             servicemanager.EVENTLOG_INFORMATION_TYPE,
@@ -131,7 +131,7 @@ class AgentSupervisor(object):
 
     def stop(self):
         # Stop all services.
-        log.info("Killing all the agent's primary processes.")
+        log.info("Stopping the agent processes...")
         self.running = False
         for proc in self.procs.values():
             proc.terminate()
@@ -144,8 +144,8 @@ class AgentSupervisor(object):
         secs = int(time.time()-self.start_ts)
         mins = int(secs/60)
         hours = int(secs/3600)
-        log.info("They're all dead! The agent has been run for {0} hours {1} "
-                 "minutes {2} seconds".format(hours, mins % 60, secs % 60))
+        log.info("Agent processes stopped.")
+        log.info("Uptime: {0} hours {1} minutes {2} seconds".format(hours, mins % 60, secs % 60))
 
     def run(self):
         self.start_ts = time.time()
