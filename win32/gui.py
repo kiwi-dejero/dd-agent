@@ -561,10 +561,6 @@ class MainWindow(QSplitter):
             "JMX log file"
         )
         if Platform.is_windows():
-            self.supervisor_log_file = EditorFile(
-                config.get('supervisor_log_file'),
-                "Supervisor log file"
-            )
             self.service_log_file = EditorFile(
                 config.get('service_log_file'),
                 "Service log file"
